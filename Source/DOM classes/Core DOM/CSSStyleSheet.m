@@ -9,11 +9,6 @@
 @synthesize ownerRule;
 @synthesize cssRules;
 
-- (void)dealloc {
-    self.ownerRule = nil;
-    self.cssRules = nil;
-    [super dealloc];
-}
 
 /**
  Used to insert a new rule into the style sheet. The new rule now becomes part of the cascade.
@@ -37,12 +32,12 @@
 	NSCharacterSet *whitespaceSet = [NSCharacterSet whitespaceAndNewlineCharacterSet];
 	rule = [rule stringByTrimmingCharactersInSet:whitespaceSet];
 	
-	//             DDLogVerbose(@"A substringie %@", idStyleString);
+	//             SVGKitLogVerbose(@"A substringie %@", idStyleString);
 	
 	NSArray* stringSplitContainer = [rule componentsSeparatedByString:@"{"];
 	if( [stringSplitContainer count] >= 2 ) //not necessary unless using shitty svgs
 	{
-		CSSStyleRule* newRule = [[[CSSStyleRule alloc] initWithSelectorText:[stringSplitContainer objectAtIndex:0] styleText:[stringSplitContainer objectAtIndex:1]] autorelease];
+		CSSStyleRule* newRule = [[CSSStyleRule alloc] initWithSelectorText:[stringSplitContainer objectAtIndex:0] styleText:[stringSplitContainer objectAtIndex:1]];
 		
 		[self.cssRules.internalArray insertObject:newRule atIndex:index-1]; // CSS says you insert "BEFORE" the index, which is the opposite of most C-based programming languages
 		
@@ -67,7 +62,7 @@
     self = [super init];
     if (self)
 	{
-		self.cssRules = [[[CSSRuleList alloc]init] autorelease];
+		self.cssRules = [[CSSRuleList alloc]init];
 		@autoreleasepool { //creating lots of autoreleased strings, not helpful for older devices
 			
 			/**
@@ -76,7 +71,7 @@
 			 NB: you NEED the NSRegularExpressionDotMatchesLineSeparators argument - which Apple DOES NOT HONOUR in NSString - hence have to use NSRegularExpression
 			 */
 			NSError* error;
-			NSRegularExpression* regexp = [NSRegularExpression regularExpressionWithPattern:@"/\\*.*\\*/" options: NSRegularExpressionDotMatchesLineSeparators error:&error];
+			NSRegularExpression* regexp = [NSRegularExpression regularExpressionWithPattern:@"/\\*.*?\\*/" options: NSRegularExpressionDotMatchesLineSeparators error:&error];
 			styleSheetBody = [regexp stringByReplacingMatchesInString:styleSheetBody options:0 range:NSMakeRange(0,styleSheetBody.length) withTemplate:@""];
 			
 			NSArray *classNameAndStyleStrings = [styleSheetBody componentsSeparatedByCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"}"]];

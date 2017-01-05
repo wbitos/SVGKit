@@ -26,7 +26,7 @@
         else if( [units isEqualToString:@"objectBoundingBox"] )
             clipPathUnits = SVG_UNIT_TYPE_OBJECTBOUNDINGBOX;
         else {
-            DDLogWarn(@"Unknown clipPathUnits value %@", units);
+            SVGKitLogWarn(@"Unknown clipPathUnits value %@", units);
             NSError *error = [NSError errorWithDomain:@"SVGKit" code:1 userInfo:[NSDictionary dictionaryWithObjectsAndKeys:
                                                                                  [NSString stringWithFormat:@"Unknown clipPathUnits value %@", units], NSLocalizedDescriptionKey,
                                                                                  nil]];
@@ -38,7 +38,7 @@
 - (CALayer *) newLayer
 {
     
-    CALayer* _layer = [[CALayerWithChildHitTest layer] retain];
+    CALayer* _layer = [CALayerWithChildHitTest layer];
     
     [SVGHelperUtilities configureCALayer:_layer usingElement:self];
     

@@ -12,18 +12,12 @@
 @synthesize documentElement;
 
 
-- (void)dealloc {
-  [doctype release];
-  [implementation release];
-  [documentElement release];
-  [super dealloc];
-}
 
 -(Element*) createElement:(NSString*) tagName
 {
 	Element* newElement = [[Element alloc] initWithLocalName:tagName attributes:nil];
 	
-	DDLogVerbose( @"[%@] WARNING: SVG Spec, missing feature: if there are known attributes with default values, Attr nodes representing them SHOULD BE automatically created and attached to the element.", [self class] );
+	SVGKitLogVerbose( @"[%@] WARNING: SVG Spec, missing feature: if there are known attributes with default values, Attr nodes representing them SHOULD BE automatically created and attached to the element.", [self class] );
 	
 	return newElement;
 }
@@ -66,7 +60,7 @@
 
 -(NodeList*) getElementsByTagName:(NSString*) data
 {
-	NodeList* accumulator = [[[NodeList alloc] init] autorelease];
+	NodeList* accumulator = [[NodeList alloc] init];
 	[DOMHelperUtilities privateGetElementsByName:data inNamespace:nil childrenOfElement:self.documentElement addToList:accumulator];
 	
 	return accumulator;
@@ -84,7 +78,7 @@
 {
 	Element* newElement = [[Element alloc] initWithQualifiedName:qualifiedName inNameSpaceURI:namespaceURI attributes:nil];
 	
-	DDLogVerbose( @"[%@] WARNING: SVG Spec, missing feature: if there are known attributes with default values, Attr nodes representing them SHOULD BE automatically created and attached to the element.", [self class] );
+	SVGKitLogVerbose( @"[%@] WARNING: SVG Spec, missing feature: if there are known attributes with default values, Attr nodes representing them SHOULD BE automatically created and attached to the element.", [self class] );
 	
 	return newElement;
 }
@@ -93,14 +87,14 @@
 -(Attr*) createAttributeNS:(NSString*) namespaceURI qualifiedName:(NSString*) qualifiedName
 {
 	NSAssert( FALSE, @"This should be re-implemented to share code with createElementNS: method above" );
-	Attr* newAttr = [[[Attr alloc] initWithNamespace:namespaceURI qualifiedName:qualifiedName value:@""] autorelease];
+	Attr* newAttr = [[Attr alloc] initWithNamespace:namespaceURI qualifiedName:qualifiedName value:@""];
 	return newAttr;
 }
 
 // Introduced in DOM Level 2:
 -(NodeList*) getElementsByTagNameNS:(NSString*) namespaceURI localName:(NSString*) localName
 {
-	NodeList* accumulator = [[[NodeList alloc] init] autorelease];
+	NodeList* accumulator = [[NodeList alloc] init];
 	[DOMHelperUtilities privateGetElementsByName:localName inNamespace:namespaceURI childrenOfElement:self.documentElement addToList:accumulator];
 	
 	return accumulator;

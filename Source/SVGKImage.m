@@ -25,7 +25,7 @@
 #if ENABLE_GLOBAL_IMAGE_CACHE_FOR_SVGKIMAGE_IMAGE_NAMED
 @interface SVGKImageCacheLine : NSObject
 @property(nonatomic) int numberOfInstances;
-@property(nonatomic,retain) SVGKImage* mainInstance;
+@property(nonatomic,strong) SVGKImage* mainInstance;
 @end
 @implementation SVGKImageCacheLine
 @synthesize numberOfInstances;
@@ -37,15 +37,15 @@
 
 @property(nonatomic) CGSize internalSizeThatWasSetExplicitlyByUser;
 
-@property (nonatomic, retain, readwrite) SVGKParseResult* parseErrorsAndWarnings;
+@property (nonatomic, strong, readwrite) SVGKParseResult* parseErrorsAndWarnings;
 
-@property (nonatomic, retain, readwrite) SVGKSource* source;
+@property (nonatomic, strong, readwrite) SVGKSource* source;
 
-@property (nonatomic, retain, readwrite) SVGDocument* DOMDocument;
-@property (nonatomic, retain, readwrite) SVGSVGElement* DOMTree; // needs renaming + (possibly) replacing by DOMDocument
-@property (nonatomic, retain, readwrite) CALayer* CALayerTree;
+@property (nonatomic, strong, readwrite) SVGDocument* DOMDocument;
+@property (nonatomic, strong, readwrite) SVGSVGElement* DOMTree; // needs renaming + (possibly) replacing by DOMDocument
+@property (nonatomic, strong, readwrite) CALayer* CALayerTree;
 #if ENABLE_GLOBAL_IMAGE_CACHE_FOR_SVGKIMAGE_IMAGE_NAMED
-@property (nonatomic, retain, readwrite) NSString* nameUsedToInstantiate;
+@property (nonatomic, strong, readwrite) NSString* nameUsedToInstantiate;
 #endif
 
 #pragma mark - UIImage methods cloned and re-implemented as SVG intelligent methods
@@ -80,7 +80,7 @@ static NSMutableDictionary* globalSVGKImageCache;
 {
 	if ([globalSVGKImageCache count] == 0) return;
 	
-	DDLogWarn(@"[%@] Low-mem or background; purging cache of %lu SVGKImages...", self, (unsigned long)[globalSVGKImageCache count] );
+	SVGKitLogWarn(@"[%@] Low-mem or background; purging cache of %lu SVGKImages...", self, (unsigned long)[globalSVGKImageCache count] );
 	
 	[globalSVGKImageCache removeAllObjects]; // once they leave the cache, if they are no longer referred to, they should automatically dealloc
 }
@@ -88,7 +88,7 @@ static NSMutableDictionary* globalSVGKImageCache;
 
 #pragma mark - Convenience initializers
 
-+ (SVGKImage *)imageNamed:(NSString *)name
++ (SVGKImage *)imageNamed:(NSString *)name inBundle:(NSBundle *)bundle
 {	
 #if ENABLE_GLOBAL_IMAGE_CACHE_FOR_SVGKIMAGE_IMAGE_NAMED
     if( globalSVGKImageCache == nil )
@@ -104,7 +104,7 @@ static NSMutableDictionary* globalSVGKImageCache;
     }
 #endif
 	
-	SVGKSource* source = [SVGKSourceLocalFile internalSourceAnywhereInBundleUsingName:name];
+    SVGKSource *source = [SVGKSourceLocalFile internalSourceAnywhereInBundle:bundle usingName:name];
 	
 	/**
 	 Key moment: init and parse the SVGKImage
@@ -117,7 +117,7 @@ static NSMutableDictionary* globalSVGKImageCache;
     result->cameFromGlobalCache = TRUE;
     result.nameUsedToInstantiate = name;
     
-    SVGKImageCacheLine* newCacheLine = [[[SVGKImageCacheLine alloc] init] autorelease];
+    SVGKImageCacheLine* newCacheLine = [[SVGKImageCacheLine alloc] init];
     newCacheLine.mainInstance = result;
     
     [globalSVGKImageCache setValue:newCacheLine forKey:name];
@@ -129,6 +129,11 @@ static NSMutableDictionary* globalSVGKImageCache;
 #endif
     
     return result;
+}
+
++ (SVGKImage *)imageNamed:(NSString *)name
+{
+    return [self imageNamed:name inBundle:[NSBundle mainBundle]];
 }
 
 +(SVGKParser *) imageAsynchronouslyNamed:(NSString *)name onCompletion:(SVGKImageAsynchronousLoadingDelegate)blockCompleted
@@ -163,7 +168,7 @@ static NSMutableDictionary* globalSVGKImageCache;
 				   ^{
 					   SVGKParseResult* parsedSVG = [parser parseSynchronously];
 					   
-					   SVGKImage* finalImage = [[[SVGKImage alloc] initWithParsedSVG:parsedSVG fromSource:source] autorelease];
+					   SVGKImage* finalImage = [[SVGKImage alloc] initWithParsedSVG:parsedSVG fromSource:source];
 					   
 #if ENABLE_GLOBAL_IMAGE_CACHE_FOR_SVGKIMAGE_IMAGE_NAMED
 					   if( finalImage != nil )
@@ -171,7 +176,7 @@ static NSMutableDictionary* globalSVGKImageCache;
 						   finalImage->cameFromGlobalCache = TRUE;
 						   finalImage.nameUsedToInstantiate = source.keyForAppleDictionaries;
 						   
-						   SVGKImageCacheLine* newCacheLine = [[[SVGKImageCacheLine alloc] init] autorelease];
+						   SVGKImageCacheLine* newCacheLine = [[SVGKImageCacheLine alloc] init];
 						   newCacheLine.mainInstance = finalImage;
 						   
 						   [globalSVGKImageCache setValue:newCacheLine forKey:source.keyForAppleDictionaries];
@@ -191,28 +196,48 @@ static NSMutableDictionary* globalSVGKImageCache;
 + (SVGKImage*) imageWithContentsOfURL:(NSURL *)url {
 	NSParameterAssert(url != nil);
 	@synchronized(self) {
-	return [[[[self class] alloc] initWithContentsOfURL:url] autorelease];
+	return [[[self class] alloc] initWithContentsOfURL:url];
     }
 }
 
 + (SVGKImage*) imageWithContentsOfFile:(NSString *)aPath {
     @synchronized(self) {
-	return [[[[self class] alloc] initWithContentsOfFile:aPath] autorelease];
+	return [[[self class] alloc] initWithContentsOfFile:aPath];
     }
+}
+
++ (SVGKImage*) imageWithContentsOfFileAsynchronously:(NSString *)aPath onCompletion:(SVGKImageAsynchronousLoadingDelegate)blockCompleted {
+	return [self imageWithSource:[SVGKSourceLocalFile sourceFromFilename:aPath] onCompletion:blockCompleted];
 }
 
 + (SVGKImage*) imageWithSource:(SVGKSource *)newSource
 {
 	NSParameterAssert(newSource != nil);
 	@synchronized(self) {
-	return [[[[self class] alloc] initWithSource:newSource] autorelease];
+        return [[[self class] alloc] initWithSource:newSource];
     }
+}
+
++ (SVGKImage*) imageWithData:(NSData *)newNSData
+{
+	NSParameterAssert(newNSData != nil);
+	@synchronized(self) {
+        return [[[self class] alloc] initWithData:newNSData];
+    }
+}
+
++ (SVGKImage*) imageWithDataAsynchronously:(NSData *)newNSData onCompletion:(SVGKImageAsynchronousLoadingDelegate)blockCompleted
+{
+	NSParameterAssert(newNSData != nil);
+	SVGKitLogWarn(@"Creating an SVG from raw data; this is not recommended: SVG requires knowledge of at least the URL where it came from (as it can contain relative file-links internally). You should use the method [SVGKImage initWithSource:] instead and specify an SVGKSource with more detail" );
+
+	return [self imageWithSource:[SVGKSourceNSData sourceFromData:newNSData URLForRelativeLinks:nil] onCompletion:blockCompleted];
 }
 
 -(void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context
 {
 	/** Remove and release (if appropriate) all cached render-output */
-	DDLogVerbose(@"[%@] source data changed; de-caching cached data", [self class] );
+	SVGKitLogVerbose(@"[%@] source data changed; de-caching cached data", [self class] );
 	self.CALayerTree = nil;
 }
 
@@ -243,7 +268,7 @@ static NSMutableDictionary* globalSVGKImageCache;
 		
 		if ( self.DOMDocument == nil )
 		{
-			DDLogError(@"[%@] ERROR: failed to init SVGKImage with source = %@, returning nil from init methods. Parser warnings and errors = %@", [self class], parseSource, parseErrorsAndWarnings );
+			SVGKitLogError(@"[%@] ERROR: failed to init SVGKImage with source = %@, returning nil from init methods. Parser warnings and errors = %@", [self class], parseSource, parseErrorsAndWarnings );
 			self = nil;
 		}
 		
@@ -277,7 +302,7 @@ static NSMutableDictionary* globalSVGKImageCache;
 {
 	NSParameterAssert(data != nil);
 	
-	DDLogWarn(@"Creating an SVG from raw data; this is not recommended: SVG requires knowledge of at least the URL where it came from (as it can contain relative file-links internally). You should use the method [SVGKImage initWithSource:] instead and specify an SVGKSource with more detail" );
+	SVGKitLogWarn(@"Creating an SVG from raw data; this is not recommended: SVG requires knowledge of at least the URL where it came from (as it can contain relative file-links internally). You should use the method [SVGKImage initWithSource:] instead and specify an SVGKSource with more detail" );
 	
 	return [self initWithSource:[SVGKSourceNSData sourceFromData:data URLForRelativeLinks:nil]];
 }
@@ -302,20 +327,13 @@ static NSMutableDictionary* globalSVGKImageCache;
 		[self removeObserver:self forKeyPath:@"DOMTree.viewport"];
 	}
 	@catch (NSException *exception) {
-		DDLogError(@"Exception removing DOMTree.viewport observer");
+		SVGKitLogError(@"Exception removing DOMTree.viewport observer");
 	}
 	
-    self.source = nil;
-    self.parseErrorsAndWarnings = nil;
     
-    self.DOMDocument = nil;
-	self.DOMTree = nil;
-	self.CALayerTree = nil;
 #if ENABLE_GLOBAL_IMAGE_CACHE_FOR_SVGKIMAGE_IMAGE_NAMED
-    self.nameUsedToInstantiate = nil;
 #endif
 	
-	[super dealloc];
 }
 
 //TODO mac alternatives to UIKit functions
@@ -504,7 +522,7 @@ static NSMutableDictionary* globalSVGKImageCache;
 	
 	if( originalLayer == nil )
 	{
-		DDLogError(@"[%@] ERROR: requested a clone of CALayer with id = %@, but there is no layer with that identifier in the parsed SVG layer stack", [self class], identifier );
+		SVGKitLogError(@"[%@] ERROR: requested a clone of CALayer with id = %@, but there is no layer with that identifier in the parsed SVG layer stack", [self class], identifier );
 		return nil;
 	}
 	else
@@ -550,15 +568,15 @@ static NSMutableDictionary* globalSVGKImageCache;
 		
 		if( currentLayer.superlayer == nil )
 		{
-			DDLogWarn(@"AWOOGA: layer %@ has no superlayer!", originalLayer );
+			SVGKitLogWarn(@"AWOOGA: layer %@ has no superlayer!", originalLayer );
 		}
 		
 		while( currentLayer.superlayer != nil )
 		{
-			//DEBUG: DDLogVerbose(@"shifting (%2.2f, %2.2f) to accomodate offset of layer = %@ inside superlayer = %@", currentLayer.superlayer.frame.origin.x, currentLayer.superlayer.frame.origin.y, currentLayer, currentLayer.superlayer );
+			//DEBUG: SVGKitLogVerbose(@"shifting (%2.2f, %2.2f) to accomodate offset of layer = %@ inside superlayer = %@", currentLayer.superlayer.frame.origin.x, currentLayer.superlayer.frame.origin.y, currentLayer, currentLayer.superlayer );
 			
 			currentLayer = currentLayer.superlayer;
-			//DEBUG: DDLogVerbose(@"...next superlayer in positioning absolute = %@, %@", currentLayer, NSStringFromCGRect(currentLayer.frame));
+			//DEBUG: SVGKitLogVerbose(@"...next superlayer in positioning absolute = %@, %@", currentLayer, NSStringFromCGRect(currentLayer.frame));
 			xOffset += currentLayer.frame.origin.x;
 			yOffset += currentLayer.frame.origin.y;
 		}
@@ -567,7 +585,7 @@ static NSMutableDictionary* globalSVGKImageCache;
 		clonedLayer.frame = lFrame;
 		
 		
-		return [clonedLayer retain];
+		return clonedLayer;
 	}
 }
 
@@ -575,7 +593,9 @@ static NSMutableDictionary* globalSVGKImageCache;
 {
 	CALayer *layer = [element newLayer];
 	
-	//DEBUG: DDLogVerbose(@"[%@] DEBUG: converted SVG element (class:%@) to CALayer (class:%@ frame:%@ pointer:%@) for id = %@", [self class], NSStringFromClass([element class]), NSStringFromClass([layer class]), NSStringFromCGRect( layer.frame ), layer, element.identifier);
+	layer.hidden = ![self isElementVisible:element];
+	
+	//DEBUG: SVGKitLogVerbose(@"[%@] DEBUG: converted SVG element (class:%@) to CALayer (class:%@ frame:%@ pointer:%@) for id = %@", [self class], NSStringFromClass([element class]), NSStringFromClass([layer class]), NSStringFromCGRect( layer.frame ), layer, element.identifier);
 	
 	NodeList* childNodes = element.childNodes;
 	Node* saveParentNode = nil;
@@ -592,7 +612,7 @@ static NSMutableDictionary* globalSVGKImageCache;
 
 		NodeList* nodeList = [[NodeList alloc] init];
 		[nodeList.internalArray addObject:element];
-		childNodes = [nodeList autorelease];
+		childNodes = nodeList;
     }
     else
     if ( [element isKindOfClass:[SVGSwitchElement class]] )
@@ -620,7 +640,7 @@ static NSMutableDictionary* globalSVGKImageCache;
         {
             if ([child conformsToProtocol:@protocol(ConverterSVGToCALayer)]) {
                 
-                CALayer *sublayer = [[self newLayerWithElement:(SVGElement<ConverterSVGToCALayer> *)child] autorelease];
+                CALayer *sublayer = [self newLayerWithElement:(SVGElement<ConverterSVGToCALayer> *)child];
                 
                 if (!sublayer) {
                     continue;
@@ -632,9 +652,9 @@ static NSMutableDictionary* globalSVGKImageCache;
         
         [clipPathElement layoutLayer:clipLayer toMaskLayer:layer];
         
-        DDLogWarn(@"DOESNT WORK, APPLE's API APPEARS BROKEN???? - About to mask layer frame (%@) with a mask of frame (%@)", NSStringFromCGRect(layer.frame), NSStringFromCGRect(clipLayer.frame));
+        SVGKitLogWarn(@"DOESNT WORK, APPLE's API APPEARS BROKEN???? - About to mask layer frame (%@) with a mask of frame (%@)", NSStringFromCGRect(layer.frame), NSStringFromCGRect(clipLayer.frame));
         layer.mask = clipLayer;
-        [clipLayer release]; // because it was created with a +1 retain count
+         // because it was created with a +1 retain count
     }
 	
 	/**
@@ -647,8 +667,14 @@ static NSMutableDictionary* globalSVGKImageCache;
 	{
 		if ([child conformsToProtocol:@protocol(ConverterSVGToCALayer)]) {
 			
-			CALayer *sublayer = [[self newLayerWithElement:(SVGElement<ConverterSVGToCALayer> *)child] autorelease];
-			
+			CALayer *sublayer = [self newLayerWithElement:(SVGElement<ConverterSVGToCALayer> *)child];
+			 if (saveParentNode) {   // Use element (offsets) adjust sublayers.   TODO: Size adjustment.
+                CGRect lFrame = sublayer.frame; // https://github.com/SVGKit/SVGKit/issues/384#issuecomment-159151069
+                lFrame.origin = CGPointMake( lFrame.origin.x + layer.frame.origin.x, lFrame.origin.y + layer.frame.origin.y );
+                sublayer.frame = lFrame;
+                //DEBUG	SVGKitLogVerbose(@"\t[%@] DEBUG:  childern (class:%@) to CALayer (class:%@ frame:%@ pointer:%@) for id = %@", [self class], NSStringFromClass([child class]), NSStringFromClass([sublayer class]), NSStringFromCGRect( sublayer.frame ), sublayer, child.identifier);
+            }
+
 			if (!sublayer) {
 				continue;
 			}
@@ -728,15 +754,15 @@ static NSMutableDictionary* globalSVGKImageCache;
 {
 	if( CALayerTree == nil )
 	{
-		DDLogInfo(@"[%@] WARNING: no CALayer tree found, creating a new one (will cache it once generated)", [self class] );
+		SVGKitLogInfo(@"[%@] WARNING: no CALayer tree found, creating a new one (will cache it once generated)", [self class] );
 
 		NSDate* startTime = [NSDate date];
-		self.CALayerTree = [[self newCALayerTree] autorelease];
+		self.CALayerTree = [self newCALayerTree];
 		
-		DDLogInfo(@"[%@] ...time taken to convert from DOM to fresh CALayers: %2.3f seconds)", [self class], -1.0f * [startTime timeIntervalSinceNow] );		
+		SVGKitLogInfo(@"[%@] ...time taken to convert from DOM to fresh CALayers: %2.3f seconds)", [self class], -1.0f * [startTime timeIntervalSinceNow] );		
 	}
 	else
-		DDLogVerbose(@"[%@] fetching CALayerTree: re-using cached CALayers (FREE))", [self class] );
+		SVGKitLogVerbose(@"[%@] fetching CALayerTree: re-using cached CALayers (FREE))", [self class] );
 	
 	return CALayerTree;
 }
@@ -758,7 +784,7 @@ static NSMutableDictionary* globalSVGKImageCache;
 		
 		if( subLayerID != nil )
 		{
-			DDLogVerbose(@"[%@] element id: %@ => layer: %@", [self class], subLayerID, subLayer);
+			SVGKitLogVerbose(@"[%@] element id: %@ => layer: %@", [self class], subLayerID, subLayer);
 			
 			[self addSVGLayerTree:subLayer withIdentifier:subLayerID toDictionary:layersByID];
 			
@@ -775,7 +801,7 @@ static NSMutableDictionary* globalSVGKImageCache;
 	
 	[self addSVGLayerTree:rootLayer withIdentifier:self.DOMTree.identifier toDictionary:layersByElementId];
 	
-	DDLogVerbose(@"[%@] ROOT element id: %@ => layer: %@", [self class], self.DOMTree.identifier, rootLayer);
+	SVGKitLogVerbose(@"[%@] ROOT element id: %@ => layer: %@", [self class], self.DOMTree.identifier, rootLayer);
 	
     return layersByElementId;
 }
@@ -795,6 +821,17 @@ static NSMutableDictionary* globalSVGKImageCache;
 		smallestScaleUp = MAX( wScale, hScale ); // instead of scaling-up the smallest, scale-down the largest
 	
 	self.size = CGSizeApplyAffineTransform( self.size, CGAffineTransformMakeScale( smallestScaleUp, smallestScaleUp));
+}
+
+-(BOOL) isElementVisible:(SVGElement *) element
+{
+    NSString *display = [element cascadedValueForStylableProperty:@"display" inherit:NO];
+    if( [display isEqualToString:@"none"] )
+        return NO;
+    NSString *visibility = [element cascadedValueForStylableProperty:@"visibility" inherit:NO];
+    if( [visibility isEqualToString:@"hidden"] )
+        return NO;
+    return YES;
 }
 
 @end

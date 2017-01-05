@@ -10,7 +10,7 @@
 @interface CSSPrimitiveValue()
 
 @property(nonatomic) float internalValue;
-@property(nonatomic,retain) NSString* internalString;
+@property(nonatomic,strong) NSString* internalString;
 
 @end
 
@@ -23,10 +23,6 @@
 
 @synthesize primitiveType;
 
-- (void)dealloc {
-    self.internalString = nil;
-    [super dealloc];
-}
 
 - (id)init
 {
@@ -95,6 +91,7 @@
 					
 				default:
 				{
+					valueAsInches = 0;
 					NSAssert( FALSE, @"This line is impossible but Apple's compiler is crap" );
 				}
 			}
@@ -224,9 +221,7 @@
 
 -(void)setCssText:(NSString *)newCssText
 {
-	[_cssText release];
 	_cssText = newCssText;
-	[_cssText retain];
 	
 	/** the css text value has been set, so we need to split the elements up and save them in the internal array */
 	if( _cssText == nil
@@ -291,7 +286,7 @@
 		{
 			/* Option 2: it's a string - or corrupt, which we're not going to handle here */
 #if DEBUG_DOM_PARSING
-			DDLogVerbose(@"[%@] WARNING: not bothering to work out 'what kind of CSS string' this string is. CSS is stupid. String = %@", [self class], _cssText );
+			SVGKitLogVerbose(@"[%@] WARNING: not bothering to work out 'what kind of CSS string' this string is. CSS is stupid. String = %@", [self class], _cssText );
 #endif
 			[self setStringValue:CSS_STRING stringValue:_cssText]; // -------- NB: we allow any string-to-string conversion, so it's not a huge problem that we dont correctly detect "url" versus "other kind of string". I hate CSS Parsing...
 		}

@@ -72,7 +72,7 @@
 		
 	if( isTagAllowedToBeAViewport && isTagDefiningAViewport )
 	{
-		DDLogVerbose(@"[%@] WARNING: setting self (tag = %@) to be a viewport", [self class], self.tagName );
+		SVGKitLogVerbose(@"[%@] WARNING: setting self (tag = %@) to be a viewport", [self class], self.tagName );
 		self.viewportElement =  self;
 	}
 	else
@@ -150,7 +150,7 @@
 				 
 				 For now: we simply "do nothing but set everything to nil"
 				 */
-				DDLogWarn( @"SVGElement has had its parent set to nil; this makes the element and tree beneath it no-longer-valid SVG data; this may require fix-up if you try to re-add that SVGElement or any of its children back to an existing/new SVG tree");
+				SVGKitLogWarn( @"SVGElement has had its parent set to nil; this makes the element and tree beneath it no-longer-valid SVG data; this may require fix-up if you try to re-add that SVGElement or any of its children back to an existing/new SVG tree");
 				self.rootOfCurrentDocumentFragment = nil;
 			}
 			else
@@ -166,7 +166,7 @@
 				[self reCalculateAndSetViewportElementReferenceUsingFirstSVGAncestor:firstAncestorThatIsAnyKindOfSVGElement];
 				
 #if DEBUG_SVG_ELEMENT_PARSING
-				DDLogVerbose(@"viewport Element = %@ ... for node/element = %@", self.viewportElement, self.tagName);
+				SVGKitLogVerbose(@"viewport Element = %@ ... for node/element = %@", self.viewportElement, self.tagName);
 #endif
 			}
 		}
@@ -187,14 +187,6 @@
             ((SVGElement *) child).viewportElement = viewport;
 }
 
-- (void)dealloc {
-	[_stringValue release];
-	[_identifier release];
-	[xmlbase release];
-	self.className = nil;
-    self.style = nil;
-	[super dealloc];
-}
 
 - (void)loadDefaults {
 	// to be overriden by subclasses
@@ -218,7 +210,7 @@
 	/** CSS styles and classes */
 	if ( [self getAttributeNode:@"style"] )
 	{
-		self.style = [[[CSSStyleDeclaration alloc] init] autorelease];
+		self.style = [[CSSStyleDeclaration alloc] init];
 		self.style.cssText = [self getAttribute:@"style"]; // causes all the LOCALLY EMBEDDED style info to be parsed
 	}
 	if( [self getAttributeNode:@"class"])
@@ -263,7 +255,7 @@
             }
 		
 #if !(TARGET_OS_IPHONE) && ( !defined( __MAC_10_7 ) || __MAC_OS_X_VERSION_MIN_REQUIRED < __MAC_10_6_7 )
-		DDLogVerbose(@"[%@] WARNING: the transform attribute requires OS X 10.7 or above (we need Regular Expressions! Apple was slow to add them :( ). Ignoring TRANSFORMs in SVG!", [self class] );
+		SVGKitLogVerbose(@"[%@] WARNING: the transform attribute requires OS X 10.7 or above (we need Regular Expressions! Apple was slow to add them :( ). Ignoring TRANSFORMs in SVG!", [self class] );
 #else
 		NSError* error = nil;
 		NSRegularExpression* regexpTransformListItem = [NSRegularExpression regularExpressionWithPattern:@"[^\\(\\),]*\\([^\\)]*" options:0 error:&error]; // anything except space and brackets ... followed by anything except open bracket ... plus anything until you hit a close bracket
@@ -273,21 +265,22 @@
 		{
 			NSString* transformString = [value substringWithRange:[result range]];
 			
-			//EXTREME DEBUG: DDLogVerbose(@"[%@] DEBUG: found a transform element (should be command + open bracket + args + close bracket) = %@", [self class], transformString);
+			//EXTREME DEBUG: SVGKitLogVerbose(@"[%@] DEBUG: found a transform element (should be command + open bracket + args + close bracket) = %@", [self class], transformString);
 			
 			NSRange loc = [transformString rangeOfString:@"("];
 			if( loc.length == 0 )
 			{
-				DDLogError(@"[%@] ERROR: input file is illegal, has an item in the SVG transform attribute which has no open-bracket. Item = %@, transform attribute value = %@", [self class], transformString, value );
+				SVGKitLogError(@"[%@] ERROR: input file is illegal, has an item in the SVG transform attribute which has no open-bracket. Item = %@, transform attribute value = %@", [self class], transformString, value );
 				return;
 			}
 			NSString* command = [transformString substringToIndex:loc.location];
-			NSArray* parameterStrings = [[transformString substringFromIndex:loc.location+1] componentsSeparatedByCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@", "]];
+            NSString* rawParametersString = [transformString substringFromIndex:loc.location+1];
+			NSArray* parameterStrings = [rawParametersString componentsSeparatedByCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@", "]];
 			
 			/** if you get ", " (comma AND space), Apple sends you an extra 0-length match - "" - between your args. We strip that here */
 			parameterStrings = [parameterStrings filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"length > 0"]];
 			
-			//EXTREME DEBUG: DDLogVerbose(@"[%@] DEBUG: found parameters = %@", [self class], parameterStrings);
+			//EXTREME DEBUG: SVGKitLogVerbose(@"[%@] DEBUG: found parameters = %@", [self class], parameterStrings);
 			
 			command = [command stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@" "]];
 			
@@ -355,7 +348,7 @@
 //					selfTransformable.transform = CGAffineTransformConcat( nt, selfTransformable.transform ); // Apple's method appears to be backwards, and not doing what Apple's docs state
 					} else
 					{
-					DDLogError(@"[%@] ERROR: input file is illegal, has an SVG matrix transform attribute without the required 1 or 3 parameters. Item = %@, transform attribute value = %@", [self class], transformString, value );
+					SVGKitLogError(@"[%@] ERROR: input file is illegal, has an SVG matrix transform attribute without the required 1 or 3 parameters. Item = %@, transform attribute value = %@", [self class], transformString, value );
 					return;
 				}
 			}
@@ -381,7 +374,7 @@
 			}
 		}];
 		
-		//DEBUG: DDLogVerbose(@"[%@] Set local / relative transform = (%2.2f, %2.2f // %2.2f, %2.2f) + (%2.2f, %2.2f translate)", [self class], selfTransformable.transform.a, selfTransformable.transform.b, selfTransformable.transform.c, selfTransformable.transform.d, selfTransformable.transform.tx, selfTransformable.transform.ty );
+		//DEBUG: SVGKitLogVerbose(@"[%@] Set local / relative transform = (%2.2f, %2.2f // %2.2f, %2.2f) + (%2.2f, %2.2f translate)", [self class], selfTransformable.transform.a, selfTransformable.transform.b, selfTransformable.transform.c, selfTransformable.transform.d, selfTransformable.transform.tx, selfTransformable.transform.ty );
 #endif
 		}
 	}
@@ -426,9 +419,34 @@
 	return self;
 }
 
+- (NSRange) nextSelectorGroupFromText:(NSString *) selectorText startFrom:(NSRange) previous
+{
+    previous.location = previous.location + previous.length;
+    if( previous.location < selectorText.length )
+    {
+        if( [selectorText characterAtIndex:previous.location] == ',' )
+            previous.location = previous.location + 1;
+        
+        NSCharacterSet *whitespace = [NSCharacterSet whitespaceAndNewlineCharacterSet];
+        while( previous.location < selectorText.length && [whitespace characterIsMember:[selectorText characterAtIndex:previous.location]] )
+            previous.location = previous.location + 1;
+        
+        if( previous.location < selectorText.length ) {
+            previous.length = selectorText.length - previous.location;
+            NSRange nextGroup = [selectorText rangeOfString:@"," options:0 range:previous];
+            if( nextGroup.location == NSNotFound )
+                return previous;
+            else
+                return NSMakeRange(previous.location, nextGroup.location - previous.location);
+        }
+    }
+    return NSMakeRange(NSNotFound, -1);
+}
+
 - (NSRange) nextSelectorRangeFromText:(NSString *) selectorText startFrom:(NSRange) previous
 {
-    NSCharacterSet *alphaNum = [NSCharacterSet alphanumericCharacterSet];
+    NSMutableCharacterSet *identifier = [NSMutableCharacterSet alphanumericCharacterSet];
+    [identifier addCharactersInString:@"-_"];
 	NSCharacterSet *selectorStart = [NSCharacterSet characterSetWithCharactersInString:@"#."];
     
     NSInteger start = -1;
@@ -438,9 +456,12 @@
         unichar c = [selectorText characterAtIndex:i];
         if( [selectorStart characterIsMember:c] )
         {
-            start = i;
+            if( start == -1 )
+                start = i;
+            else
+                break;
         }
-        else if( [alphaNum characterIsMember:c] )
+        else if( [identifier characterIsMember:c] )
         {
             if( start == -1 )
                 start = i;
@@ -458,30 +479,75 @@
         return NSMakeRange(NSNotFound, -1);
 }
 
-- (BOOL) selector:(NSString *)selector appliesTo:(SVGElement *) element
+- (BOOL) selector:(NSString *)selector appliesTo:(SVGElement *) element specificity:(NSInteger*) specificity
 {
     if( [selector characterAtIndex:0] == '.' )
-        return element.className != nil && [element.className isEqualToString:[selector substringFromIndex:1]];
+    {
+        if( element.className != nil )
+        {
+            selector = [selector substringFromIndex:1];
+            __block BOOL matched = NO;
+            [element.className enumerateSubstringsInRange:NSMakeRange(0, element.className.length) options:NSStringEnumerationByWords usingBlock:^(NSString *substring, NSRange substringRange, NSRange enclosingRange, BOOL *stop)
+             {
+                 if( [substring isEqualToString:selector] )
+                 {
+                     matched = YES;
+                     *stop = YES;
+                 }
+             }];
+            if( matched )
+            {
+                *specificity += 100;
+                return YES;
+            }
+        }
+    }
     else if( [selector characterAtIndex:0] == '#' )
-        return element.identifier != nil && [element.identifier isEqualToString:[selector substringFromIndex:1]];
-    else
-        return element.nodeName != nil && [element.nodeName isEqualToString:selector];
+    {
+        if( element.identifier != nil && [element.identifier isEqualToString:[selector substringFromIndex:1]] )
+        {
+            *specificity += 10000;
+            return YES;
+        }
+    }
+    else if( element.nodeName != nil && [element.nodeName isEqualToString:selector] )
+    {
+        *specificity += 1;
+        return YES;
+    }
+    else if( [selector isEqualToString:@"*"] )
+    {
+        return YES;
+    }
+    return NO;
 }
 
-- (BOOL) styleRule:(CSSStyleRule *) styleRule appliesTo:(SVGElement *) element
+- (BOOL) styleRule:(CSSStyleRule *) styleRule appliesTo:(SVGElement *) element specificity:(NSInteger*) specificity
 {
-    NSRange nextRule = [self nextSelectorRangeFromText:styleRule.selectorText startFrom:NSMakeRange(0, 0)];
-    if( nextRule.location == NSNotFound )
-        return NO;
-    
-    while( nextRule.location != NSNotFound )
+    NSRange nextGroup = [self nextSelectorGroupFromText:styleRule.selectorText startFrom:NSMakeRange(0, 0)];
+    while( nextGroup.location != NSNotFound )
     {
-        if( ![self selector:[styleRule.selectorText substringWithRange:nextRule] appliesTo:element] )
-            return NO;
+        NSRange nextRule = [self nextSelectorRangeFromText:styleRule.selectorText startFrom:NSMakeRange(nextGroup.location, 0)];
         
-        nextRule = [self nextSelectorRangeFromText:styleRule.selectorText startFrom:nextRule];
+        BOOL match = nextRule.location != NSNotFound;
+        while( nextRule.location != NSNotFound )
+        {
+            if( ![self selector:[styleRule.selectorText substringWithRange:nextRule] appliesTo:element specificity:specificity] )
+            {
+                match = NO;
+                break;
+            }
+            nextRule = [self nextSelectorRangeFromText:styleRule.selectorText startFrom:nextRule];
+            if( nextRule.location > (nextGroup.location + nextGroup.length) )
+                break;
+        }
+        
+        if( match )
+            return YES;
+        
+        nextGroup = [self nextSelectorGroupFromText:styleRule.selectorText startFrom:nextGroup];
     }
-    return YES;
+    return NO;
 }
 
 #pragma mark - CSS cascading special attributes
@@ -501,76 +567,84 @@
 	 
 	 http://www.w3.org/TR/SVG/propidx.html
 	 
-	 For each of those, the implementaiton is the same.
+	 For each of those, the implementation is the same.
 	 
-	 ********* WAWRNING: THE CURRENT IMPLEMENTATION BELOW IS VEYR MUCH INCOMPLETE, BUT IT WORKS FOR VERY SIMPLE SVG'S ************
+	 ********* WAWRNING: THE CURRENT IMPLEMENTATION BELOW IS VERY MUCH INCOMPLETE, BUT IT WORKS FOR VERY SIMPLE SVG'S ************
 	 */
-	if( [self hasAttribute:stylableProperty])
-		return [self getAttribute:stylableProperty];
-	else
-	{
-		NSString* localStyleValue = [self.style getPropertyValue:stylableProperty];
-		
-		if( localStyleValue != nil )
-			return localStyleValue;
-		else
-		{
-            /** we have a locally declared CSS class; let's go hunt for it in the document's stylesheets */
-            
-            @autoreleasepool /** DOM / CSS is insanely verbose, so this is likely to generate a lot of crud objects */
+    NSString* localStyleValue = [self.style getPropertyValue:stylableProperty];
+    
+    if( localStyleValue != nil )
+        return localStyleValue;
+    
+    /** we have a locally declared CSS class; let's go hunt for it in the document's stylesheets */
+    
+    @autoreleasepool /** DOM / CSS is insanely verbose, so this is likely to generate a lot of crud objects */
+    {
+        CSSStyleRule *mostSpecificRule = nil;
+        NSInteger mostSpecificity = -1;
+        
+        for( StyleSheet* genericSheet in self.rootOfCurrentDocumentFragment.styleSheets.internalArray.reverseObjectEnumerator ) // because it's far too much effort to use CSS's low-quality iteration here...
+        {
+            if( [genericSheet isKindOfClass:[CSSStyleSheet class]])
             {
-                for( StyleSheet* genericSheet in self.rootOfCurrentDocumentFragment.styleSheets.internalArray ) // because it's far too much effort to use CSS's low-quality iteration here...
+                CSSStyleSheet* cssSheet = (CSSStyleSheet*) genericSheet;
+                
+                for( CSSRule* genericRule in cssSheet.cssRules.internalArray.reverseObjectEnumerator)
                 {
-                    if( [genericSheet isKindOfClass:[CSSStyleSheet class]])
+                    if( [genericRule isKindOfClass:[CSSStyleRule class]])
                     {
-                        CSSStyleSheet* cssSheet = (CSSStyleSheet*) genericSheet;
+                        CSSStyleRule* styleRule = (CSSStyleRule*) genericRule;
                         
-                        for( CSSRule* genericRule in cssSheet.cssRules.internalArray)
+                        if( [styleRule.style getPropertyCSSValue:stylableProperty] != nil )
                         {
-                            if( [genericRule isKindOfClass:[CSSStyleRule class]])
+                            NSInteger ruleSpecificity = 0;
+                            if( [self styleRule:styleRule appliesTo:self specificity:&ruleSpecificity] )
                             {
-                                CSSStyleRule* styleRule = (CSSStyleRule*) genericRule;
-                                
-                                if( [self styleRule:styleRule appliesTo:self] )
-                                {
-                                    return [styleRule.style getPropertyValue:stylableProperty];
+                                if( ruleSpecificity > mostSpecificity ) {
+                                    mostSpecificity = ruleSpecificity;
+                                    mostSpecificRule = styleRule;
                                 }
                             }
                         }
                     }
                 }
-			}
-			
-			/** either there's no class *OR* it found no match for the class in the stylesheets */
-			
-            if( inherit )
-            {
-                /** Finally: move up the tree until you find a <G> node, and ask it to provide the value
-                 OR: if you find an <SVG> tag before you find a <G> tag, give up
-                 */
-                
-                Node* parentElement = self.parentNode;
-                while( parentElement != nil
-                      && ! [parentElement isKindOfClass:[SVGGElement class]]
-                      && ! [parentElement isKindOfClass:[SVGSVGElement class]])
-                {
-                    parentElement = parentElement.parentNode;
-                }
-                
-                if( parentElement == nil
-                   || [parentElement isKindOfClass:[SVGSVGElement class]] )
-                    return nil; // give up!
-                else
-                {
-                    return [((SVGElement*)parentElement) cascadedValueForStylableProperty:stylableProperty];
-                }
             }
-            else
-            {
-                return nil;
-            }
-		}
-	}
+        }
+        
+        if( mostSpecificRule != nil )
+            return [mostSpecificRule.style getPropertyValue:stylableProperty];
+    }
+    
+    /** if there's a local property, use that */
+    if( [self hasAttribute:stylableProperty])
+        return [self getAttribute:stylableProperty];
+    
+    if( inherit )
+    {
+        /** Finally: move up the tree until you find a <G> or <SVG> node, and ask it to provide the value
+         */
+        
+        Node* parentElement = self.parentNode;
+        while( parentElement != nil
+              && ! [parentElement isKindOfClass:[SVGGElement class]]
+              && ! [parentElement isKindOfClass:[SVGSVGElement class]])
+        {
+            parentElement = parentElement.parentNode;
+        }
+        
+        if( parentElement == nil )
+        {
+            return nil; // give up!
+        }
+        else
+        {
+            return [((SVGElement*)parentElement) cascadedValueForStylableProperty:stylableProperty];
+        }
+    }
+    else
+    {
+        return nil;
+    }
 }
 
 @end
